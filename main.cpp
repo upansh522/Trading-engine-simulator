@@ -2,96 +2,46 @@
 using namespace std;
 using Clock = chrono::steady_clock; // whenever i type clock, this is what it really means
 
-
-
-
-
 // ------------------------- Events -------------------------
-
-
 struct Tick {           //a tick represents a market data update
 
     int64_t seq = 0;           //  sequence number (monotonically increasing)
     //                          int64_t so its large enough to never overflow
-
     double price = 0.0;       
-
     Clock::time_point created_at{};     //time stamp
 };
 
-
-
 enum class Side { Buy, Sell };      //list of possible options: side can only be buy or sell 
-
-
-
 
 struct OrderRequest {
     int64_t id = 0;
-
     Side side = Side::Buy;          // here because we decide intent
 
     int qty = 0;                    //quantity to trade
-    //              market order, so no limit price
-    
+    //              market order, so no limit price    
     Clock::time_point created_at{};  // time stamp
 };
 
-
-
 struct Fill {
-
     int64_t order_id = 0;
-
     Side side = Side::Buy;
-
     int qty = 0;
-
     double price = 0.0;     //execution price
-
     Clock::time_point created_at{};
 };
 
-
-
-using Event = variant<Tick, OrderRequest, Fill>;           //create alias called event to use 
-
-// variant guarantees exactly one active type and no invalid states
-// event can be a tick, an order or a fill... all would be pushed in queue
-
-
-// not defining it as enum class using union cuz wouldnt be able to take multiple types as event in same time
-
-
-
+using Event = variant<Tick, OrderRequest, Fill>;    
 
 // ------------------------- Queue -------------------------
-
-
 class EventQueue {      //a mailbox for events: where we store events until they get processed by engine
 public:
-
-
-    // defining functions (methods)
-
-
     void push(Event e) { 
-
-        // It adds a new event to the back of the queue.
-
-        q_.push_back(move(e));         //push_back is predefined
+        q_.push_back(move(e));
     }
-
-
 
     bool empty() const { 
-
-        // to check whether there any events waiting: TRUE or FALSE
-
         return q_.empty(); 
     }
-
-
 
     optional<Event> pop() {            //returns an event (optionnally ==> c'est pas sur que ca retourne haga aslan) that's why we dont just put event car whatif nothing is returned
 
@@ -109,10 +59,7 @@ private:
 };
 
 
-
-
 // ------------------------- Metrics -------------------------
-
 struct Metrics {
 
     //how fast is the engine??      → throughput (events per second)
@@ -170,9 +117,6 @@ struct Metrics {
 
         lat_ns.push_back(ns);       //adds value to the latency vector
     }
-
-
-
 
     void finish() { 
         // records the exact moment the simulation finishes so total runtime (wall time) can be computed.
@@ -236,25 +180,15 @@ struct Metrics {
     }
 };
 
-
-
-
-
-
-
 // ------------------------- Market Data Feed (Sim) -------------------------
 
 class MarketDataFeed {
-
-
 public:
     MarketDataFeed(double start_price, unsigned seed)       //must give these 2 values to create an object: a starting price AND a seed (how randomness start)
 
         : price_(start_price), rng_(seed), dist_(0.0, 0.2) {} //Set the internal price to the starting price;
         //Create the random number generator using this seed
        // et up the randomness so price changes are small and centered around 0
-
-
 
     Tick next_tick() {
 
@@ -282,18 +216,9 @@ private:
 };
 
 
-
-
-
-
-
 // ------------------------- Strategy -------------------------
-
-
-
 class SimpleMomentumStrategy {
 public:
-
     // If price moves up/down more than threshold since last tick, trade.
 
     //it reacts tick-by-tick, comparing the current price to the previous one.
@@ -301,7 +226,6 @@ public:
     optional<OrderRequest> on_tick(const Tick& t) {        //can return order request or not, we dk
         
         //takes as input a tick
-
         optional<OrderRequest> out; //optional = empty by default until affected
 
         if (last_price_.has_value()) {              //cuz can only compute if theres a last tick to compare to
@@ -334,18 +258,10 @@ private:
 };
 
 
-
-
-
-
-
-
-
 // ------------------------- Risk Checks -------------------------
 
 class RiskChecks {                                      //      “Is this order allowed?”
 public:
-
 // only case where its not allowed is when exeeding max quanitty
 
     bool allow(const OrderRequest& o) const {                   //flag system 
@@ -356,23 +272,11 @@ public:
         return true;
     }
 
-
 private:
     int max_qty_ = 100;     // Maximum allowed quantity per order. hard coded here for simplicity but normally varies 3alatoul
 };
 
-
-
-
-
-
-
-
-
 // ------------------------- Execution Simulator -------------------------
-
-
-
 class ExecutionSimulator {                  // takes an order and returns a fill (copies most)
 public:
 
@@ -390,15 +294,7 @@ public:
     }
 };
 
-
-
-
-
-
-
-
 // ------------------------- Portfolio -------------------------
-
 class Portfolio {
 public:
 
@@ -448,17 +344,7 @@ private:
     double last_price_ = 0.0; //the latest market price of this stock 
 };
 
-
-
-
-
-
-
 // ------------------------- Main / Engine Loop -------------------------
-
-
-
-
 int main() {
     const int num_ticks = 10;                                                                        // MODFIY
     //how many tick simulations 
@@ -477,16 +363,10 @@ int main() {
 
     double last_price = 100.0;                       //initialized as first price
 
-
-
     //tick generator
     for (int i = 0; i < num_ticks; i++) {
-
         q.push(feed.next_tick());           // at each itteration next_tick() outputs a tick that's pushed to queue
-
     }
-
-
 
     while (!q.empty()) {
 
@@ -515,9 +395,6 @@ int main() {
             if (ord.has_value()) q.push(*ord);          //if yes push to queue 
 
 
-
-
-
         } else if (auto* o = get_if<OrderRequest>(&*e)) {      //if order 
 
             //RAPPEL:  (struct: ID, side, quantity, time stamp)
@@ -533,24 +410,13 @@ int main() {
             }
 
 
-
-
         } else if (auto* f = get_if<Fill>(&*e)) {
             m.record_latency(f->created_at);
             port.on_fill(*f);           //update portfolio
         }
-
-
-
     }
-
-
-
     m.finish();             //update end value for total time 
-
     port.print_final();         //print final portfolio
-
     m.print_summary();          //print metrics after having complete latency vector
-
     return 0;
 }   
