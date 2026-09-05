@@ -1,0 +1,12 @@
+# binaries
+sim
+*.o
+*.out
+
+# editor files
+.vscode/
+
+# macOS junk
+.DS_Store
+
+
